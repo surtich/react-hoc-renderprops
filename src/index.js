@@ -3,8 +3,17 @@ import ReactDOM from "react-dom";
 
 const TestComponent = ({ title }) => <div>{title}</div>;
 
+const toHOC = Render => Component => props => (
+  <Render {...props}>{props => <Component {...props} />}</Render>
+);
+
+const fromHOC = hoc => hoc(props => props.children(props));
+
 const withLoadingHOC = Component => ({ loading, ...props }) =>
   loading ? <div>...loading from HOC</div> : <Component {...props} />;
+
+const WithLoadingRenderProps = ({ loading, children, ...props }) =>
+  loading ? <div>...loading from render props</div> : children(props);
 
 const withFetchHOC = WrappedComponent =>
   class WithFetchHOC extends Component {
@@ -27,7 +36,9 @@ const withFetchHOC = WrappedComponent =>
         loading,
         data: { title }
       } = this.state;
-      return <WrappedComponent loading={loading} title={title} />;
+      return (
+        <WrappedComponent loading={loading} title={title} {...this.props} />
+      );
     }
   };
 
@@ -51,13 +62,10 @@ class WithFetchRenderProps extends Component {
       loading,
       data: { title }
     } = this.state;
-    const { children } = this.props;
-    return children({ loading, title });
+    const { children, ...props } = this.props;
+    return children({ ...props, loading, title });
   }
 }
-
-const WithLoadingRenderProps = ({ loading, children }) =>
-  loading ? <div>...loading from render props</div> : children();
 
 const App = () => {
   const TestHOCComponent = withFetchHOC(withLoadingHOC(TestComponent));
@@ -70,11 +78,21 @@ const App = () => {
       )}
     </WithFetchRenderProps>
   );
+  const TestToHOC = toHOC(WithFetchRenderProps)(withLoadingHOC(TestComponent));
+  const TestFromHOC = fromHOC(withFetchHOC);
   return (
     <div>
       <TestComponent title="Hi from normal component" />
       <TestHOCComponent />
       {testRenderPropComponent}
+      {<TestToHOC />}
+      <TestFromHOC>
+        {({ loading, title }) => (
+          <WithLoadingRenderProps loading={loading}>
+            {() => <TestComponent title={title} />}
+          </WithLoadingRenderProps>
+        )}
+      </TestFromHOC>
     </div>
   );
 };
